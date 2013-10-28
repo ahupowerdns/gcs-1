@@ -30,7 +30,7 @@
 #include <vector>
 #include <iostream>
 
-typedef uint32_t hash_t;
+typedef uint64_t hash_t;
 
 class GCSBuilder
 {
@@ -49,7 +49,8 @@ class GCSQuery
 	std::istream &f;
 	uint8_t *gcs;
 	int gcs_len;
-
+	std::vector<std::pair<hash_t, uint64_t> > d_positions;
+	
 public:
 	GCSQuery(std::istream &f);
 	~GCSQuery();

@@ -31,6 +31,11 @@
 #include <algorithm>
 #include <assert.h>
 
+using std::lower_bound;
+using std::pair;
+using std::endl;
+using std::cout;
+
 inline uint64_t BITMASK(unsigned int n) 
 {
   assert(n < 63);
@@ -120,7 +125,7 @@ public:
 	GolombEncoder(std::ostream &_f, int _P)
 		: f(_f), P(_P)
 	{
-		log2P = floor_log2(P);
+		log2P = floor_log2(P); // max length of modulo bit
 		assert(log2P > 0);
 	}
 
@@ -179,14 +184,14 @@ void GCSBuilder::finalize(std::ostream& f)
 class BitReader
 {
 private:
-	uint8_t *data;
-	int len;
+	uint8_t *data; 
+	int len; // data + len == end
 	uint32_t accum;
-	int n;
-
+	int n; // bits available in accum, read from the right
+	uint8_t* origdata;
 public:
 	BitReader(uint8_t *data_, int len_)
-		: data(data_), len(len_), accum(0), n(0)
+		: data(data_), len(len_), accum(0), n(0), origdata(data_)
 	{}
 
 	bool eof(void)
@@ -194,6 +199,21 @@ public:
 		return (len == 0 && n == 0);
 	}
 
+	uint64_t getPos() 
+	{
+		return 8*(data-origdata)-n;
+	}
+	
+	void skip(uint64_t nbits) 
+	{
+		unsigned int bytes = nbits/8;
+		data += bytes;
+		len -= bytes;
+		n = 0;
+		accum = 0;
+		read(nbits % 8); // discard
+	}
+	
 	uint32_t read(int nbits)
 	{
 		assert(nbits < 32);
@@ -240,10 +260,11 @@ class GolombDecoder
 {
 	BitReader f;
 	int P, log2P;
+	uint64_t d_pos;
 
 public:
 	GolombDecoder(uint8_t *gcs, int len, int P_)
-		: f(gcs, len), P(P_)
+		: f(gcs, len), P(P_), d_pos(0)
 	{
 		log2P = floor_log2(P);
 	}
@@ -255,6 +276,8 @@ public:
 
 	hash_t next(void)
 	{
+		d_pos = f.getPos();
+
 		hash_t v = 0;
 		while (f.read(1))
 		{
@@ -264,6 +287,15 @@ public:
 		}
 		v += f.read(log2P);
 		return v;
+	}
+
+	uint64_t getPos()
+	{
+		return d_pos;
+	}
+	void skip(uint64_t bits)
+	{
+		f.skip(bits);
 	}
 };
 
@@ -285,6 +317,19 @@ GCSQuery::GCSQuery(std::istream &f_)
 	gcs_len = len-8;
 	gcs = new uint8_t[gcs_len];
 	f.read((char*)gcs, gcs_len);
+
+	GolombDecoder gd(gcs, gcs_len, P);
+	hash_t value=0;
+	while (!gd.eof())
+	{
+		hash_t diff = gd.next();
+		value += diff;
+		if(1 || !(value%1000)) {
+			cout<<"Storing: hash "<<value<<" is at position "<<gd.getPos()<<", diff="<<diff<<endl;
+			d_positions.push_back(std::make_pair(value-diff, gd.getPos()));
+		}
+	}
+	std::cout<<"size: "<<d_positions.size()<<std::endl;
 }
 
 GCSQuery::~GCSQuery()
@@ -294,15 +339,29 @@ GCSQuery::~GCSQuery()
 
 bool GCSQuery::query(const void *data, int size)
 {
-	unsigned h = gcs_hash(data, size, N, P);
-	unsigned int value = 0;
-		
+	hash_t h = gcs_hash(data, size, N, P);
+	hash_t value = 0;
+
 	GolombDecoder gd(gcs, gcs_len, P);
+	
+
+	auto iter = lower_bound(d_positions.begin(), d_positions.end(), h,
+				[](const pair<hash_t, uint64_t>& a, const hash_t& b) { return a.first < b; }); 
+	
+	if(iter == d_positions.end())
+		return false;
+	while(iter != d_positions.begin() && h < iter->first)
+		--iter;
+
+	std::cout<<"Skipping "<<iter->second<<" bits to hash "<<iter->first<<" for hash "<<h<<endl;
+	gd.skip(iter->second);
+	value=iter->first;
+
 	while (!gd.eof())
 	{
 		unsigned int diff = gd.next();
 		value += diff;
-
+		cout <<"Compare: "<<value << " ?== "<< h<< ", diff="<<diff<<", @"<<gd.getPos()<<endl;
 		if (value == h)
 			return true;
 		else if (value > h)

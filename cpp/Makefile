@@ -1,4 +1,4 @@
-CXXFLAGS=-Wall -MMD -O3 
+CXXFLAGS=-Wall -MMD -O3 -std=gnu++0x
 CFLAGS=-Wall -MMD -O3
 all: gcs
 
