@@ -324,8 +324,8 @@ GCSQuery::GCSQuery(std::istream &f_)
 	{
 		hash_t diff = gd.next();
 		value += diff;
-		if(1 || !(value%1000)) {
-			cout<<"Storing: hash "<<value<<" is at position "<<gd.getPos()<<", diff="<<diff<<endl;
+		if(!(value % 100)) {
+		  //			cout<<"Storing: hash "<<value<<" is at position "<<gd.getPos()<<", diff="<<diff<<endl;
 			d_positions.push_back(std::make_pair(value-diff, gd.getPos()));
 		}
 	}
@@ -343,7 +343,6 @@ bool GCSQuery::query(const void *data, int size)
 	hash_t value = 0;
 
 	GolombDecoder gd(gcs, gcs_len, P);
-	
 
 	auto iter = lower_bound(d_positions.begin(), d_positions.end(), h,
 				[](const pair<hash_t, uint64_t>& a, const hash_t& b) { return a.first < b; }); 
@@ -352,8 +351,9 @@ bool GCSQuery::query(const void *data, int size)
 		return false;
 	while(iter != d_positions.begin() && h < iter->first)
 		--iter;
+	--iter;
 
-	std::cout<<"Skipping "<<iter->second<<" bits to hash "<<iter->first<<" for hash "<<h<<endl;
+	std::cout<<"Skipping "<<iter->second<<" bits to hash "<<iter->first<<" for calculated hash "<<h<<endl;
 	gd.skip(iter->second);
 	value=iter->first;
 
@@ -361,7 +361,7 @@ bool GCSQuery::query(const void *data, int size)
 	{
 		unsigned int diff = gd.next();
 		value += diff;
-		cout <<"Compare: "<<value << " ?== "<< h<< ", diff="<<diff<<", @"<<gd.getPos()<<endl;
+		//		cout <<"Compare: "<<value << " ?== "<< h<< ", diff="<<diff<<", @"<<gd.getPos()<<endl;
 		if (value == h)
 			return true;
 		else if (value > h)

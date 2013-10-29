@@ -26,6 +26,9 @@
 #include "gcs.h"
 #include <iostream>
 #include <fstream>
+#include <chrono>
+
+using namespace std::chrono;
 
 static void usage(void)
 {
@@ -60,7 +63,7 @@ int main(int argc, char *argv[])
 
 		int numwords = 0;
 		std::string line;
-
+		
 		while (std::getline(f,line), !f.eof())
 			++numwords;
 		f.clear();
@@ -97,6 +100,7 @@ int main(int argc, char *argv[])
 		}
 
 		GCSQuery q(f);
+		auto t0 = high_resolution_clock::now();
 		for (int i=2; i < argc; ++i)
 		{
 			std::string s(argv[i]);
@@ -105,6 +109,9 @@ int main(int argc, char *argv[])
 			std::cout << "Querying for \"" << s << "\": " <<
 				(found ? "TRUE" : "FALSE") << "\n";
 		}
+		auto t1 = high_resolution_clock::now();
+		std::cerr<< 1000.0*argc/duration_cast<milliseconds>(t1-t0).count()<< " lookups/second"<<std::endl;
+		std::cerr<< duration_cast<microseconds>(t1-t0).count()/argc<< " usec/lookup"<<std::endl;
 	}
 	else
 	{
