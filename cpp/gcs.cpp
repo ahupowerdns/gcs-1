@@ -353,7 +353,7 @@ bool GCSQuery::query(const void *data, int size)
 		--iter;
 	--iter;
 
-	std::cout<<"Skipping "<<iter->second<<" bits to hash "<<iter->first<<" for calculated hash "<<h<<endl;
+	// std::cout<<"Skipping "<<iter->second<<" bits to hash "<<iter->first<<" for calculated hash "<<h<<endl;
 	gd.skip(iter->second);
 	value=iter->first;
 
